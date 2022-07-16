@@ -1,4 +1,4 @@
-import { useReducer, createContext, useEffect } from "react";
+import { useReducer, createContext, useEffect, useRef } from "react";
 import axios from "axios";
 import { useRouter } from "next/router";
 
@@ -26,11 +26,24 @@ const rootReducer = (state, action) => {
 const Provider = ({ children }) => {
   const [state, dispatch] = useReducer(rootReducer, inialState);
   const router = useRouter();
+  //to stop useEffect run twice.
+  const effectRun = useRef(false);
   useEffect(() => {
-    dispatch({
-      type: "LOGIN",
-      payload: JSON.parse(window.localStorage.getItem("user")),
-    });
+    if (effectRun.current === false) {
+      const getCsrfToken = async () => {
+        const { data } = await axios.get("/api/csrf-token");
+        console.log("csrf", data);
+        axios.defaults.headers["X-CSRF-Token"] = data.getCsrfToken;
+      };
+      getCsrfToken();
+      dispatch({
+        type: "LOGIN",
+        payload: JSON.parse(window.localStorage.getItem("user")),
+      });
+      return () => {
+        effectRun.current = true;
+      };
+    }
   }, []);
 
   axios.interceptors.response.use(
@@ -61,14 +74,15 @@ const Provider = ({ children }) => {
     }
   );
 
-  useEffect(() => {
-    const getCsrfToken = async () => {
-      const { data } = await axios.get("/api/csrf-token");
-      console.log("csrf", data);
-      axios.defaults.headers["X-CSRF-Token"] = data.getCsrfToken;
-    };
-    getCsrfToken();
-  });
+  // useEffect(() => {
+  //   const getCsrfToken = async () => {
+  //     const { data } = await axios.get("/api/csrf-token");
+  //     console.log("csrf", data);
+  //     axios.defaults.headers["X-CSRF-Token"] = data.getCsrfToken;
+  //   };
+  //   getCsrfToken();
+  // });
+
   return (
     <Context.Provider value={{ state, dispatch }}>{children}</Context.Provider>
   );
